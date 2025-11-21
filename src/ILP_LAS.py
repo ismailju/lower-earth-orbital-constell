@@ -26,7 +26,7 @@ from pulp.constants import LpMaximize
 #f: discharge on communication unit/time
 #g: discharge on computation unit/time 
 #s: (t,j) if 1 then satellite is in shadow otherwise in light
-def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g, s):
+def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g, s,beta):
 	prob = plp.LpProblem('LEO_K', plp.LpMaximize)
 	
 	
@@ -123,7 +123,9 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
 	
 
 	#Battery constraint
-	
+
+	##Battery constraint on underflow
+	"""
 	for j in S:
 		for t in H:
 			prob += C[j] - ( (e * plp.lpSum(x[t1,i,j] for i in A for t1 in range(0,t+1))) + (f * plp.lpSum(y[t1,i,j,k] for i in A for k in B for t1 in range(0,t+1))) + (g * plp.lpSum(z[t1,i,j] for i in A for t1 in range(0,t+1))) + (d * plp.lpSum(s[t1,j] for t1 in range(0,t+1))) ) + (c * plp.lpSum((1 - s[t1,j]) for t1 in range(0,t+1))) >= theta[j]
@@ -131,13 +133,15 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
 	for j in S:
 		for t in H:
 			prob += C[j] - ( (e * plp.lpSum(x[t1,i,j] for i in A for t1 in range(0,t+1))) + (f * plp.lpSum(y[t1,i,j,k] for i in A for k in B for t1 in range(0,t+1))) + (g * plp.lpSum(z[t1,i,j] for i in A for t1 in range(0,t+1))) + (d * t) ) + (c * plp.lpSum((1 - s[t1,j]) for t1 in range(0,t+1))) >= theta[j]
-    """
+
+	##Battery constraint on overflow
+	for j in S:
+		for t in H:
+			prob += C[j] + (c * plp.lpSum(1-s[t1,j]) for t1 in range(0,t+1)) <= beta
+
 
 	#Objective function
 	prob.setObjective(plp.lpSum(x[t,i,j] for t in H for i in A for j in S))
-	
-	
-	
 	
 	status = prob.solve(plp.PULP_CBC_CMD(msg = True))
 	print("STATUS: ", status)

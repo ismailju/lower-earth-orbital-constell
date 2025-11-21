@@ -37,11 +37,15 @@ for k in B:
 #Initial battery capacity of satellites
 C = {}
 theta = {}
+beta = {}
+
 for j in S:
 	C[j] = 4
 	if j==0:
 		C[j]=4.2
 	theta[j] = 3
+	beta[j] = 20
+
 #"""
 c = 0.4 #CHARGING		
 d = 0.3 #DISCHARGING
@@ -108,5 +112,5 @@ print("\n\nSCHEDULE WITHOUT BATTERY CONSTRAINT")
 ILP2(H, S, A, B, mem, up, down, col, com, p, pt)
 '''
 print("\n\nSCHEDULE FOLLOWING BATTERY CONSTRAINT AND PROCESSING CAPABILITY")
-ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g, s)
+ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g, s, beta)
 
