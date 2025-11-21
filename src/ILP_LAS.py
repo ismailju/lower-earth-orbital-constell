@@ -137,7 +137,7 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
 	##Battery constraint on overflow
 	for j in S:
 		for t in H:
-			prob += C[j] + (c * plp.lpSum(1-s[t1,j]) for t1 in range(0,t+1)) <= beta
+			prob += C[j] + (c * plp.lpSum(1 - s[t1,j] for t1 in range(0,t+1))) <= beta[j]
 
 
 	#Objective function
