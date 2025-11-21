@@ -40,7 +40,7 @@ theta = {}
 for j in S:
 	C[j] = 4
 	if j==0:
-	    C[j]=4.2
+		C[j]=4.2
 	theta[j] = 3
 #"""
 c = 0.4 #CHARGING		
