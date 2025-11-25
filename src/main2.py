@@ -42,7 +42,7 @@ beta = {}
 for j in S:
 	C[j] = 4
 	if j==0:
-		C[j]=4.2
+		C[j]=8
 	theta[j] = 3
 	beta[j] = 20
 
