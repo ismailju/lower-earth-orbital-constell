@@ -1,12 +1,14 @@
 from ILP_LAS import ILP_LAS
 from ILP2 import ILP2
 from ILP import ILP
+from os import path
+from utility.dictionaryGene import process_satellite_data
 
 #Example 1
-n = 9	#Number of regions
-m = 2 #Number of satellites
-o = 3 #Number of ground stations
-p = 9 #Time
+n = 185	#Number of regions
+m = 24 #Number of satellites
+o = 20 #Number of ground stations
+p = 5400 #Time
 
 
 #Horizon
@@ -63,32 +65,43 @@ g = 0
 #"""
     
 #Collection opportunities <t,Sj,Ai>
-col =  {(0,0,0): 0.25, 
-		(0,0,8): 0.75, 
-		(0,1,4): -0.5,
-		(1,0,1): -0.25,
-		(1,1,6): -1.0,
-		(2,0,3): 1.5,
-		(2,1,5): 0.0, 
-		(2,1,6): 0.0,
-		(3,1,7): 0.0,
-		(4,0,4): 0.0,
-		(5,0,8): -0.25,
-		(5,1,0): -0.5,
-		(6,0,6): 0.5,
-		(7,1,1): 0.5,
-		(7,1,2): -0.5,
-		(8,0,8): -0.5}
+# col =  {(0,0,0): 0.25, 
+# 		(0,0,8): 0.75, 
+# 		(0,1,4): -0.5,
+# 		(1,0,1): -0.25,
+# 		(1,1,6): -1.0,
+# 		(2,0,3): 1.5,
+# 		(2,1,5): 0.0, 
+# 		(2,1,6): 0.0,
+# 		(3,1,7): 0.0,
+# 		(4,0,4): 0.0,
+# 		(5,0,8): -0.25,
+# 		(5,1,0): -0.5,
+# 		(6,0,6): 0.5,
+# 		(7,1,1): 0.5,
+# 		(7,1,2): -0.5,
+# 		(8,0,8): -0.5}
 			
 
 
 #Communication opportunities <t,j,k>:__
-com = { (3,0,0): 1, 
-		(3,1,1): 1,
-		(7,0,1): 1,  
-		(7,1,0): 1 }
+# com = { (3,0,0): 1, 
+# 		(3,1,1): 1,
+# 		(7,0,1): 1,  
+# 		(7,1,0): 1 }
 
-pt = 3
+# Get the directory where main2.py is located
+base_dir = path.dirname(path.abspath(__file__))
+
+# Join it with the relative path to the CSV (assuming it's in 'utility')
+csv_path = path.join(base_dir, 'utility', 'time_sat_reg_1.csv')
+
+# Now pass csv_path to your function
+col,com = process_satellite_data(csv_path)
+# print("Collection Opportunities:", col)
+# print("Communication Opportunities:", com)
+
+pt = 1
 
 s = {}
 for t in H:
