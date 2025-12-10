@@ -10,7 +10,6 @@ m = 24 #Number of satellites
 o = 20 #Number of ground stations
 p = 5400 #Time
 
-
 #Horizon
 H = [i for i in range(0,p)]
 #Satellites
@@ -64,7 +63,7 @@ f = 0.2
 g = 0  
 #"""
     
-#Collection opportunities <t,Sj,Ai>
+# #Collection opportunities <t,Sj,Ai>
 # col =  {(0,0,0): 0.25, 
 # 		(0,0,8): 0.75, 
 # 		(0,1,4): -0.5,
@@ -84,11 +83,13 @@ g = 0
 			
 
 
-#Communication opportunities <t,j,k>:__
+# #Communication opportunities <t,j,k>:__
 # com = { (3,0,0): 1, 
 # 		(3,1,1): 1,
 # 		(7,0,1): 1,  
 # 		(7,1,0): 1 }
+
+# pt = 3
 
 # Get the directory where main2.py is located
 base_dir = path.dirname(path.abspath(__file__))
@@ -126,4 +127,3 @@ ILP2(H, S, A, B, mem, up, down, col, com, p, pt)
 '''
 print("\n\nSCHEDULE FOLLOWING BATTERY CONSTRAINT AND PROCESSING CAPABILITY")
 ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g, s, beta)
-
