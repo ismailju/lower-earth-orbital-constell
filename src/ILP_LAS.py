@@ -1,6 +1,7 @@
 #With processing capability and battery constraint
 
 import timeit
+from numpy import var
 import pulp as plp
 import pandas as pd
 from pulp.constants import LpMaximize
@@ -30,96 +31,192 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
 	prob = plp.LpProblem('LEO_K', plp.LpMaximize)
 	
 	
-	###################################### VARIABLES ###########################################
-	#Denotes that data from Ai is collected by satellite Sj at time instant t
-	x = plp.LpVariable.dicts("x", [(t,i,j) for t in H for i in A for j in S], cat = "Binary")
-	#Denotes that at time instant t,  Sj starts processing data collected from sub-region Ai
-	z = plp.LpVariable.dicts("z", [(t,i,j) for t in H for i in A for j in S], cat = "Binary")
-	#Denotes that data from Ai collected by Sj is downloaded at GS Bk at time instant t
-	y = plp.LpVariable.dicts("y", [(t,i,j,k) for t in H for i in A for j in S for k in B], cat = 'Binary')
+	# ###################################### VARIABLES ###########################################
+	# #Denotes that data from Ai is collected by satellite Sj at time instant t
+	# x = plp.LpVariable.dicts("x", [(t,i,j) for t in H for i in A for j in S], cat = "Binary")
+	# #Denotes that at time instant t,  Sj starts processing data collected from sub-region Ai
+	# z = plp.LpVariable.dicts("z", [(t,i,j) for t in H for i in A for j in S], cat = "Binary")
+	# #Denotes that data from Ai collected by Sj is downloaded at GS Bk at time instant t
+	# y = plp.LpVariable.dicts("y", [(t,i,j,k) for t in H for i in A for j in S for k in B], cat = 'Binary')
+
+	# Collection variables only where collection is possible
+	x = plp.LpVariable.dicts(
+			"x",
+			[(t, i, j) for (t, j, i) in col],
+			cat="Binary"
+	)
+
+	# Processing variables only for collected data
+	z = plp.LpVariable.dicts(
+			"z",
+			[(t, i, j) for (t, j, i) in col if t <= p - pt],
+			cat="Binary"
+	)
+
+	# Communication variables only where downlink is possible
+	y = plp.LpVariable.dicts(
+			"y",
+			[(t, i, j, k) for (t, j, k) in com for i in A],
+			cat="Binary"
+	)
 
 
 
 
 
 
-	###################################### CONSTRAINTS ###########################################
-	#Remove the invalid collection and communication opportunities
-	for t in H:
-		for i in A:
-			for j in S:
-				if (t,j,i) not in col:
-					prob += x[t,i,j] == 0		#To remove the variables that are not collection opportunities
-				else:
-					prob += z[t,i,j] == 0		#If there is a collection opportunity, it can be processed starting from at least next instant
+	# ###################################### CONSTRAINTS ###########################################
+	# #Remove the invalid collection and communication opportunities
+	# for t in H:
+	# 	for i in A:
+	# 		for j in S:
+	# 			if (t,j,i) not in col:
+	# 				prob += x[t,i,j] == 0		#To remove the variables that are not collection opportunities
+	# 			else:
+	# 				prob += z[t,i,j] == 0		#If there is a collection opportunity, it can be processed starting from at least next instant
 				
-				for k in B:
-					if (t,j,k) not in com:
-						prob += y[t,i,j,k] == 0 #Invalid communication opportunities
+	# 			for k in B:
+	# 				if (t,j,k) not in com:
+	# 					prob += y[t,i,j,k] == 0 #Invalid communication opportunities
 				
-				if t == 0:						#Communication/Computation cannot occur at time instant 0
-					prob += z[t,i,j] == 0
-					prob += y[t,i,j,k] == 0
+	# 			if t == 0:						#Communication/Computation cannot occur at time instant 0
+	# 				prob += z[t,i,j] == 0
+	# 				prob += y[t,i,j,k] == 0
 
-				if t > (p-pt):
-					prob += z[t,i,j] == 0
+	# 			if t > (p-pt):
+	# 				prob += z[t,i,j] == 0
 
 						
 	
 	#Each satellite collects at most one area in an instant
 	for j in S:
 		for t in H:
-			prob += plp.lpSum(x[t,i,j] for i in A) <= 1
+			# prob += plp.lpSum(x[t,i,j] for i in A) <= 1
+			prob += plp.lpSum(
+        x[t,i,j] for (tt,i,jj) in x if tt == t and jj == j
+      ) <= 1
 	
 	
 	#Each area is collected at-most once
 	for i in A:
-		prob += plp.lpSum(x[t,i,j] for t in H for j in S) <= 1
+		# prob += plp.lpSum(x[t,i,j] for t in H for j in S) <= 1
+		prob += plp.lpSum(
+      x[t,i,j] for (t,ii,j) in x if ii == i
+    ) <= 1
 
 	
 	#Memory bound
+	# for j in S:
+	# 	for t in H:
+	# 		downloaded = plp.lpSum(y[t1,i,j,k] for k in B for i in A for t1 in range(0,t+1)) 
+	# 		processed = plp.lpSum(z[t1,i,j] for t1 in range(0,t-pt+1) for i in A)
+	# 		prob += plp.lpSum(x[t1,i,j] for i in A for t1 in range(0,t+1)) - (downloaded + processed) <= mem[j]
 	for j in S:
 		for t in H:
-			downloaded = plp.lpSum(y[t1,i,j,k] for k in B for i in A for t1 in range(0,t+1)) 
-			processed = plp.lpSum(z[t1,i,j] for t1 in range(0,t-pt+1) for i in A)
-			prob += plp.lpSum(x[t1,i,j] for i in A for t1 in range(0,t+1)) - (downloaded + processed) <= mem[j]
+			collected = plp.lpSum(
+				x[t1,i,j] for (t1,i,jj) in x if jj == j and t1 <= t
+			)
+
+			downloaded = plp.lpSum(
+				y[t1,i,j,k]
+				for (t1,i,jj,k) in y
+				if jj == j and t1 <= t
+			)
+
+			processed = plp.lpSum(
+				z[t1,i,j]
+				for (t1,i,jj) in z
+				if jj == j and t1 + pt <= t
+			)
+
+			prob += collected - downloaded - processed <= mem[j]
+
 			
 			
 	#Downlink capacity of ground stations
+	# for t in H:
+	# 	for k in B:
+	# 		prob += plp.lpSum(y[t,i,j,k] for i in A for j in S) <= down[k]
 	for t in H:
 		for k in B:
-			prob += plp.lpSum(y[t,i,j,k] for i in A for j in S) <= down[k]
-	
+			prob += plp.lpSum(
+				y[t,i,j,k] for (tt,i,j,kk) in y if tt == t and kk == k
+			) <= down[k]
+
 	
 	#Uplink capacity of satellites
+	# for j in S:
+	# 	for t in H:
+	# 		prob += plp.lpSum(y[t,i,j,k] for i in A for k in B) <= up[j]
 	for j in S:
 		for t in H:
-			prob += plp.lpSum(y[t,i,j,k] for i in A for k in B) <= up[j]
+			prob += plp.lpSum(
+				y[t,i,j,k] for (tt,i,jj,k) in y if tt == t and jj == j
+			) <= up[j]
+
 	
 
 	#Process all collected data
+	# for (t,j,i) in col:
+	# 	prob += x[t,i,j] - ( plp.lpSum(y[t1,i,j,k] for t1 in range(t+1,p) for k in B) + plp.lpSum(z[t1,i,j] for t1 in  range(t+1,p)) ) == 0
 	for (t,j,i) in col:
-		prob += x[t,i,j] - ( plp.lpSum(y[t1,i,j,k] for t1 in range(t+1,p) for k in B) + plp.lpSum(z[t1,i,j] for t1 in  range(t+1,p)) ) == 0
+		prob += (
+			x[(t,i,j)]
+			- plp.lpSum(
+				y[(t1,i,j,k)]
+				for (t1,ii,jj,k) in y
+				if ii == i and jj == j and t1 > t
+			)
+			- plp.lpSum(
+				z[(t1,i,j)]
+				for (t1,ii,jj) in z
+				if ii == i and jj == j and t1 > t
+			)
+			== 0
+	)
+
 
 
 	#Sequential processing
+	# for j in S:
+	# 	for t in range(1,p-pt+1):
+	# 		prob += plp.lpSum(z[t1,i,j] for i in A for t1 in range(t, min(t+pt, p))) <= 1
 	for j in S:
-		for t in range(1,p-pt+1):
-			prob += plp.lpSum(z[t1,i,j] for i in A for t1 in range(t, min(t+pt, p))) <= 1
+		for t in range(1, p - pt + 1):
+			prob += plp.lpSum(
+				z[(t1,i,j)]
+				for (t1,i,jj) in z
+				if jj == j and t <= t1 < t + pt
+			) <= 1
+
 
 	
 	#Download validation
-	for i in A:
-		for j in S:
-			for t in range(1,p):
-				prob += plp.lpSum(y[t,i,j,k] for k in B) <= plp.lpSum(x[t1,i,j] for t1 in range(0, t))
+	# for i in A:
+	# 	for j in S:
+	# 		for t in range(1,p):
+	# 			prob += plp.lpSum(y[t,i,j,k] for k in B) <= plp.lpSum(x[t1,i,j] for t1 in range(0, t))
+	for (t,i,j,k) in y:
+		prob += y[(t,i,j,k)] <= plp.lpSum(
+			x[(t1,i,j)]
+			for (t1,ii,jj) in x
+			if ii == i and jj == j and t1 < t
+    )
+
 
 	
 	#Processing validation
-	for i in A:
-		for j in S:
-			for t in range(1,p-pt):
-				prob += z[t,i,j] <= plp.lpSum(x[t1,i,j] for t1 in range(0, t))
+	# for i in A:
+	# 	for j in S:
+	# 		for t in range(1,p-pt):
+	# 			prob += z[t,i,j] <= plp.lpSum(x[t1,i,j] for t1 in range(0, t))
+	for (t,i,j) in z:
+		prob += z[(t,i,j)] <= plp.lpSum(
+			x[(t1,i,j)]
+			for (t1,ii,jj) in x
+			if ii == i and jj == j and t1 < t
+    )
+
 	
 
 	#Battery constraint
@@ -130,46 +227,82 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
 		for t in H:
 			prob += C[j] - ( (e * plp.lpSum(x[t1,i,j] for i in A for t1 in range(0,t+1))) + (f * plp.lpSum(y[t1,i,j,k] for i in A for k in B for t1 in range(0,t+1))) + (g * plp.lpSum(z[t1,i,j] for i in A for t1 in range(0,t+1))) + (d * plp.lpSum(s[t1,j] for t1 in range(0,t+1))) ) + (c * plp.lpSum((1 - s[t1,j]) for t1 in range(0,t+1))) >= theta[j]
 	"""
+	# for j in S:
+	# 	for t in H:
+	# 		prob += C[j] - ( (e * plp.lpSum(x[t1,i,j] for i in A for t1 in range(0,t+1))) + (f * plp.lpSum(y[t1,i,j,k] for i in A for k in B for t1 in range(0,t+1))) + (pt * g * plp.lpSum(z[t1,i,j] for i in A for t1 in range(0,t+1))) + (d * (t+1)) ) + (c * plp.lpSum((1 - s[t1,j]) for t1 in range(0,t+1))) >= theta[j]
 	for j in S:
 		for t in H:
-			prob += C[j] - ( (e * plp.lpSum(x[t1,i,j] for i in A for t1 in range(0,t+1))) + (f * plp.lpSum(y[t1,i,j,k] for i in A for k in B for t1 in range(0,t+1))) + (pt * g * plp.lpSum(z[t1,i,j] for i in A for t1 in range(0,t+1))) + (d * (t+1)) ) + (c * plp.lpSum((1 - s[t1,j]) for t1 in range(0,t+1))) >= theta[j]
+			prob += (
+				C[j]
+				- e * plp.lpSum(x[(t1,i,j)] for (t1,i,jj) in x if jj == j and t1 <= t)
+				- f * plp.lpSum(y[(t1,i,j,k)] for (t1,i,jj,k) in y if jj == j and t1 <= t)
+				- pt * g * plp.lpSum(z[(t1,i,j)] for (t1,i,jj) in z if jj == j and t1 <= t)
+				- d * (t + 1)
+				+ c * plp.lpSum((1 - s[(t1,j)]) for t1 in range(0, t + 1))
+				>= theta[j]
+			)
+
 
 	##Battery constraint on overflow
+	# for j in S:
+	# 	for t in H:
+	# 		prob += C[j] + (c * plp.lpSum((1 - s[t1,j]) for t1 in range(0,t+1))) <= beta[j]
 	for j in S:
 		for t in H:
-			prob += C[j] + (c * plp.lpSum((1 - s[t1,j]) for t1 in range(0,t+1))) <= beta[j]
+			prob += (
+				C[j]
+				+ c * plp.lpSum((1 - s[(t1,j)]) for t1 in range(0, t + 1))
+				<= beta[j]
+			)
+
 
 
 	#Objective function
-	prob.setObjective(plp.lpSum(x[t,i,j] for t in H for i in A for j in S))
+	# prob.setObjective(plp.lpSum(x[t,i,j] for t in H for i in A for j in S))
+	prob.setObjective(plp.lpSum(x.values()))
 	
 	status = prob.solve(plp.PULP_CBC_CMD(msg = False))
 	print("STATUS: ", status)
 	
 	if status == 1:
 		#print("COLLECTIONS DONE: ", prob.objective)
-		print("COLLECTIONS DONE: ")
-		for t in H:
-			for j in S:
-				for i in A:
-					if x[t,i,j].value() == 1:
-						print(t, ": ", j, " - ", i)
+		# print("COLLECTIONS DONE: ")
+		# for t in H:
+		# 	for j in S:
+		# 		for i in A:
+		# 			if x[t,i,j].value() == 1:
+		# 				print(t, ": ", j, " - ", i)
+		print("COLLECTIONS DONE:")
+		for (t,i,j), var in x.items():
+			if var.value() == 1:
+				print(t, ":", j, "-", i)
 
-		print("ON SATELLITE PROCESSING DONE: ")
-		for t in H:
-			for j in S:
-				for i in A:
-					if z[t,i,j].value() == 1:
-						print(t, ": ", j, " - ", i)
+
+		# print("ON SATELLITE PROCESSING DONE: ")
+		# for t in H:
+		# 	for j in S:
+		# 		for i in A:
+		# 			if z[t,i,j].value() == 1:
+		# 				print(t, ": ", j, " - ", i)
+		print("ON SATELLITE PROCESSING DONE:")
+		for (t,i,j), var in z.items():
+			if var.value() == 1:
+				print(t, ":", j, "-", i)
+
 						
 		#print("COMMUNICATIONS DONE: ", prob.objective)
-		print("COMMUNICATIONS DONE: ")
-		for t in H:
-			for k in B:
-				for j in S:
-					for i in A:
-						if y[t,i,j,k].value() == 1:
-							print(t, ": ", j, " " , i, " -> ", k)
+		# print("COMMUNICATIONS DONE: ")
+		# for t in H:
+		# 	for k in B:
+		# 		for j in S:
+		# 			for i in A:
+		# 				if y[t,i,j,k].value() == 1:
+		# 					print(t, ": ", j, " " , i, " -> ", k)
+		print("COMMUNICATIONS DONE:")
+		for (t,i,j,k), var in y.items():
+			if var.value() == 1:
+				print(t, ":", j, i, "->", k)
+
 	
 		"""
 		MEM = {}
@@ -215,5 +348,9 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
 		"""			
 							
 	#return status, prob.objective, exc_ilp, mem_ilp
-	print("Objective =", plp.value(prob.objective))
-	return status, prob.objective, 0, 0
+	# print("Objective =", plp.value(prob.objective))
+	# return status, prob.objective, 0, 0
+	obj_val = plp.value(prob.objective)
+	print("Objective =", obj_val)
+	return status, obj_val, 0, 0
+

@@ -3,7 +3,7 @@ import pandas as pd
 # from ILP2 import ILP2
 # from ILP import ILP
 from os import path
-from utility.dictionaryGene import process_satellite_data
+from utility.d import process_satellite_data
 
 
 # import your dictionary generator function
@@ -13,11 +13,15 @@ from utility.dictionaryGene import process_satellite_data
 base_dir = path.dirname(path.abspath(__file__))
 
 # Join it with the relative path to the CSV (assuming it's in 'utility')
-csv_path = path.join(base_dir, 'utility', 'time_sat_reg_1.csv')
+csv_path = path.join(base_dir, 'utility', 'hellobhai.csv')
 
 # Now pass csv_path to your function
-col,com = process_satellite_data(csv_path)
+col,com,s = process_satellite_data(csv_path)
 
+s_remapped = {
+	(time_map[t], sat_map[j]): v
+	for (t, j), v in s.items()
+}
 # col keys: (time, satcode, area_code)  where area_code starts with 'A'
 # com keys: (time, satcode, ground_code) where ground_code starts with 'G'
 
@@ -173,18 +177,18 @@ g = 0
 
 pt = 1
 
-s = {}
-for t in H:
-	if t < 4:
-		s[t,0] = 0 #LIGHT FOR S0
-	else:
-		s[t,0] = 1 #SHADOW FOR S0
+# s = {}
+# for t in H:
+# 	if t < 4:
+# 		s[t,0] = 0 #LIGHT FOR S0
+# 	else:
+# 		s[t,0] = 1 #SHADOW FOR S0
 
-for t in H:
-	if t < 5:
-		s[t,1] = 0 #LIGHT FOR S1
-	else:
-		s[t,1] = 1 #SHADOW FOR S1
+# for t in H:
+# 	if t < 5:
+# 		s[t,1] = 0 #LIGHT FOR S1
+# 	else:
+# 		s[t,1] = 1 #SHADOW FOR S1
 
 '''
 print("\n\nSCHEDULE WITHOUT BATTERY CONSTRAINT AND PROCESSING CAPABILITY")
@@ -194,5 +198,42 @@ ILP(H, S, A, B, mem, up, down, col, com, p)
 print("\n\nSCHEDULE WITHOUT BATTERY CONSTRAINT")
 ILP2(H, S, A, B, mem, up, down, col, com, p, pt)
 '''
+# remap col to compact indices
+col = {
+    (time_map[t], sat_map[j], area_map[i]): v
+    for (t, j, i), v in col.items()
+}
+
+# remap com to compact indices
+com = {
+    (time_map[t], sat_map[j], ground_map[k]): v
+    for (t, j, k), v in com.items()
+}
+
+# remap s (shadow/light)
+s = {
+    (time_map[t], sat_map[j]): v
+    for (t, j), v in s.items()
+}
+s_m = {} 
+
+for t_idx in H:      # For every time step 0..p
+	for s_idx in S:  # For every satellite 0..m
+		if (t_idx, s_idx) in s_remapped:
+			s_m[(t_idx, s_idx)] = s_remapped[(t_idx, s_idx)]
+		else:
+			# GAP FILLING: Default to 0 (Not Shaded) if missing
+			s_m[(t_idx, s_idx)] = 0
+
 print("\n\nSCHEDULE FOLLOWING BATTERY CONSTRAINT AND PROCESSING CAPABILITY")
-ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g, s, beta)
+# ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g, s, beta)
+ILP_LAS(
+    H, S, A, B,
+    C, mem, up, down,
+    col, com,
+    theta,
+    p, pt,
+    c, d, e, f, g,
+    s_m,
+    beta
+)
