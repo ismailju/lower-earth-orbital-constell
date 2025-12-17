@@ -1,77 +1,73 @@
-
-
-
-
-
-
-
+import numpy as np
 import pandas as pd
 from skyfield.api import load, EarthSatellite
-from datetime import timedelta
 
+# 1. Setup Skyfield
 ts = load.timescale()
 eph = load('de421.bsp')
 
-# df = pd.read_csv('src/utility/example_data.csv')
+# 2. Load Data
+df = pd.read_csv("src/utility/repaired_data.csv")
 
-# t0 = ts.utc(2025, 11, 28, 9, 11, 54)
-# Set Start Time to TODAY (UTC)
-t0 = ts.utc(2025, 12, 15, 12, 0, 0) # Example: 12:00 UTC today
+# --- CRITICAL: MATCH THIS EXACTLY TO YOUR OTHER SCRIPT'S T0 ---
+# Example: If your other script sees '2025-11-28T09:11:54Z' as Time 0
+year, month, day, hour, minute, second = 2025, 11, 28, 9, 11, 54
+# -------------------------------------------------------------
 
-# for row in df[["sat_name", "TLE_Line1", "TLE_Line2"]].itertuples(index=True, name=None):
-# idx, sat_name, TLE_Line1, TLE_Line2 = row
+# Initialize new columns to avoid errors
+df["light_ranges"] = None
+df["shadow_ranges"] = None
 
-# sat_name = "CALSPHERE 1"
-# CORRECT TLE (Preserving strictly fixed spacing)
-sat_name = "ISS (ZARYA)"
-# Note: Fixed-width spacing is critical!
-TLE_Line1 = "1 25544U 98067A   25348.86277765  .00007299  00000-0  13766-3 0  9993"
-TLE_Line2 = "2 25544  51.6306 131.9662 0003207 249.8734 110.1909 15.49595360543189"
-states = []
-sat = EarthSatellite(TLE_Line1, TLE_Line2, sat_name, ts)
-for sec in range(0,7201):
-  print(f"Processing satellite {sat_name}, second {sec}/5400", end="\r")
-  t_cur = t0 + (sec/86400.0)
-  sunlit = sat.at(t_cur).is_sunlit(eph)
-  states.append((sec, sunlit))
-  # states = [
-  # (0, True),
-  # (1, True),
-  # (2, False),
-  # (3, False),
-  # ...
-  # ]
-light_ranges = []
-shadow_ranges = []
+# Create the relative seconds array ONCE (0 to 7200 seconds)
+seconds_range = np.arange(0, 7201)
 
-start = states[0][0]
-prev_state = states[0][1]
+# Generate the Skyfield Time objects for this range starting from your specific T0
+# Note: ts.utc allows adding seconds array directly to the 'second' argument
+t_times = ts.utc(year, month, day, hour, minute, second + seconds_range)
 
-for sec, curr_state in states[1:]:
-  if curr_state != prev_state:
-    # range ended at previous second
-    end = sec - 1
+for idx, row in df.iterrows(): # iterrows is often easier for writing back to 'idx'
+    sat_name = row['sat_name']
+    line1 = row['TLE_Line1']
+    line2 = row['TLE_Line2']
+    
+    sat = EarthSatellite(line1, line2, sat_name, ts)
 
-    if prev_state:   # True → light
-      light_ranges.append((start, end))
-    else:            # False → shadow
-      shadow_ranges.append((start, end))
+    # 3. CALCULATE SUNLIGHT (Vectorized)
+    # Using the 't_times' we generated relative to the specific T0
+    sunlit_array = sat.at(t_times).is_sunlit(eph)
 
-    start = sec
-    prev_state = curr_state
+    # 4. EXTRACT RANGES
+    light_ranges = []
+    shadow_ranges = []
 
-# close the last range
-end = states[-1][0]
-if prev_state:
-  light_ranges.append((start, end))
-else:
-  shadow_ranges.append((start, end))
+    start = 0
+    prev_state = sunlit_array[0] # True (Light) or False (Shadow)
 
-print(f"Light ranges: {light_ranges}")
-print(f"Shadow ranges: {shadow_ranges}")
-# # Store the results back into the DataFrame
-# df.at[idx, "light_ranges"] = str(light_ranges)
-# df.at[idx, "shadow_ranges"] = str(shadow_ranges)
+    # Iterate starting from index 1
+    for sec, curr_state in enumerate(sunlit_array[1:], start=1):
+        if curr_state != prev_state:
+            end = sec - 1
+            if prev_state:
+                light_ranges.append((start, end))
+            else:
+                shadow_ranges.append((start, end))
+            
+            start = sec
+            prev_state = curr_state
 
-# # Save the updated DataFrame to a new CSV file
-# df.to_csv("src/utility/example_data_with_light_shadow.csv", index=False)
+    # Close the last range
+    end = len(sunlit_array) - 1
+    if prev_state:
+        light_ranges.append((start, end))
+    else:
+        shadow_ranges.append((start, end))
+
+    # Store as string (simplest for CSV)
+    # df.at is fast for scalar assignment
+    df.at[idx, "light_ranges"] = str(light_ranges)
+    df.at[idx, "shadow_ranges"] = str(shadow_ranges)
+
+# Save
+output_path = "src/utility/example_data_with_light_shadow.csv"
+df.to_csv(output_path, index=False)
+print(f"Saved shadow data to {output_path}")

@@ -1,239 +1,134 @@
 from ILP_LAS import ILP_LAS
 import pandas as pd
-# from ILP2 import ILP2
-# from ILP import ILP
 from os import path
+import ast # Needed to parse the string "[(0,10), (20,30)]" into a list
 from utility.d import process_satellite_data
 
-
-# import your dictionary generator function
-# from utility.dictionaryGene import process_satellite_data  # or whatever the function name is
-
-# Get the directory where main2.py is located
+# 1. SETUP PATHS
 base_dir = path.dirname(path.abspath(__file__))
+csv_path = path.join(base_dir, 'utility', 'input_data.csv')
 
-# Join it with the relative path to the CSV (assuming it's in 'utility')
-csv_path = path.join(base_dir, 'utility', 'hellobhai.csv')
+# 2. LOAD CONNECTIVITY DATA (col, com)
+# Note: process_satellite_data returns (col, com, unique_sats_index)
+col, com, unique_sats_index = process_satellite_data(csv_path)
 
-# Now pass csv_path to your function
-col,com,s = process_satellite_data(csv_path)
+# 3. LOAD SHADOW DATA (s) - MANUALLY
+# We need to read the CSV again to get the 'shadow_ranges' column
+df = pd.read_csv(csv_path)
+s = {}
 
-s_remapped = {
-	(time_map[t], sat_map[j]): v
-	for (t, j), v in s.items()
-}
-# col keys: (time, satcode, area_code)  where area_code starts with 'A'
-# com keys: (time, satcode, ground_code) where ground_code starts with 'G'
+# Re-create sat_map helper from the loaded index for consistency
+# unique_sats_index is the list ['SatA', 'SatB'...]
+sat_name_to_code = {name: i for i, name in enumerate(unique_sats_index)}
 
-# print("Collection Opportunities:", col)
-# print("Communication Opportunities:", com)
+for row in df.itertuples():
+    # Convert Sat Name -> Code
+    if row.sat_name not in sat_name_to_code: continue # Skip unknown sats
+    s_idx = sat_name_to_code[row.sat_name]
+    
+    # Parse the shadow string "[(0, 100), ...]"
+    try:
+        ranges = ast.literal_eval(row.shadow_ranges)
+    except:
+        ranges = [] # Handle empty or malformed strings
+        
+    # Mark these times as "1" (Shadow) in 's' dictionary
+    for (start, end) in ranges:
+        for t in range(int(start), int(end) + 1):
+            s[(t, s_idx)] = 1
 
-# extract unique raw values
+# 4. EXTRACT RAW LISTS & CREATE MAPPINGS
 times_raw = sorted({t for (t,_,_) in list(col.keys()) + list(com.keys())})
-sats_raw  = sorted({s for (_,s,_) in list(col.keys()) + list(com.keys())}, key=lambda x: int(x))
+# Add shadow times to known times to avoid "KeyError" later
+times_raw = sorted(list(set(times_raw) | {t for (t,_) in s.keys()}))
+
+sats_raw  = sorted(list(range(len(unique_sats_index)))) # 0..m
 areas_raw = sorted({a for (t,s,a) in col.keys()})
 grounds_raw= sorted({g for (t,s,g) in com.keys()})
 
-# create mapping to contiguous indices
-time_map = {t:i for i,t in enumerate(times_raw)}         # raw time -> compact index
-inv_time_map = {i:t for t,i in time_map.items()}         # optional inverse mapping index -> raw time
-sat_map  = {s:i for i,s in enumerate(sats_raw)}          # sat code -> sat_index
-area_map = {a:i for i,a in enumerate(areas_raw)}        # area code -> area_index
-ground_map= {g:i for i,g in enumerate(grounds_raw)}     # ground code -> ground_index
+# Create Mappings
+time_map = {t:i for i,t in enumerate(times_raw)}
+inv_time_map = {i:t for t,i in time_map.items()}
+sat_map  = {s:s for s in sats_raw} # Identity map (0->0) since we used factorize
+area_map = {a:i for i,a in enumerate(areas_raw)}
+ground_map= {g:i for i,g in enumerate(grounds_raw)}
 
-# counts (replaces n,m,o,p)
-n = len(areas_raw) #Number of regions
-m = len(sats_raw)  #Number of satellites
-o = len(grounds_raw) #Number of ground stations
-p = len(times_raw)   # number of distinct time stamps in the data
-
-# lists (useful)
-#Horizon, Satellites, AoI's, Ground stations
-H = list(range(p))            # mapped time indices 0..p-1
-S = list(range(m))						# mapped sat indices 0..m-1	
-A = list(range(n))				    # mapped area indices 0..n-1
-B = list(range(o)) 					  # mapped ground indices 0..o-1
-
-# #Horizon
-# H = [i for i in range(0,p)]
-# #Satellites
-# S = [i for i in range(0,m)]
-# #AoI's
-# A = [i for i in range(0,n)]
-# #Ground stations
-# B = [i for i in range(0,o)]
-
-# For all valid collection opportunities:
-# omega_collection: (t_idx, sat_idx, area_idx)
-omega_collection = [
-    (time_map[t_raw], sat_map[s_raw], area_map[a_raw])
-    for (t_raw, s_raw, a_raw) in col.keys()
-]
-
-# For all valid communication opportunities:
-# omega_comm: (t_idx, sat_idx, ground_idx)
-omega_comm = [
-    (time_map[t_raw], sat_map[s_raw], ground_map[g_raw])
-    for (t_raw, s_raw, g_raw) in com.keys()
-]
-
-omega_transmit = []
-
-# group collection by (t,s)
-col_by_ts = {}
-for (t_idx, s_idx, a_idx) in omega_collection:
-    col_by_ts.setdefault((t_idx, s_idx), []).append(a_idx)
-
-# group communication by (t,s)
-com_by_ts = {}
-for (t_idx, s_idx, g_idx) in omega_comm:
-    com_by_ts.setdefault((t_idx, s_idx), []).append(g_idx)
-
-# join groups: only where both collection and comm exist at same (t,s)
-for (t_idx, s_idx), areas in col_by_ts.items():
-    if (t_idx, s_idx) in com_by_ts:
-        grounds = com_by_ts[(t_idx, s_idx)]
-        for a_idx in areas:
-            for g_idx in grounds:
-                omega_transmit.append((t_idx, s_idx, a_idx, g_idx))
-
-# # For checking purposes
-# pd.DataFrame(omega_collection, columns=['t','s','a']).to_csv("omega_collection.csv", index=False)
-# pd.DataFrame(omega_comm, columns=['t','s','g']).to_csv("omega_comm.csv", index=False)
-# pd.DataFrame(omega_transmit, columns=['t','s','a','g']).to_csv("omega_transmit.csv", index=False)
-
-
-#Memory capacity of the satellites
-mem = {}
-for j in S:
-	mem[j] = 3
-	
-#Uplink capacity of each satellite
-up = {}
-for j in S:
-	up[j] = 2
-		
-#Download capacity of the ground station
-down = {}
-for k in B:
-	down[k] = 2
-	
-
-#Initial battery capacity of satellites
-C = {}
-theta = {}
-beta = {}
-
-for j in S:
-	C[j] = 5.65
-	theta[j] = 3
-	beta[j] = 20
-
-#"""
-c = 0.4 #CHARGING		
-d = 0.3 #DISCHARGING
-e = 0.25 #COLLECTION
-f = 0.25 #COMMUNICATION
-g = 0.4  #COMPUTATION
-"""
-c = 0.4
-
-d = 0.3
-e = 0.2
-f = 0.2
-
-g = 0  
-#"""
-    
-# #Collection opportunities <t,Sj,Ai>
-# col =  {(0,0,0): 0.25, 
-# 		(0,0,8): 0.75, 
-# 		(0,1,4): -0.5,
-# 		(1,0,1): -0.25,
-# 		(1,1,6): -1.0,
-# 		(2,0,3): 1.5,
-# 		(2,1,5): 0.0, 
-# 		(2,1,6): 0.0,
-# 		(3,1,7): 0.0,
-# 		(4,0,4): 0.0,
-# 		(5,0,8): -0.25,
-# 		(5,1,0): -0.5,
-# 		(6,0,6): 0.5,
-# 		(7,1,1): 0.5,
-# 		(7,1,2): -0.5,
-# 		(8,0,8): -0.5}
-			
-
-
-# #Communication opportunities <t,j,k>:__
-# com = { (3,0,0): 1, 
-# 		(3,1,1): 1,
-# 		(7,0,1): 1,  
-# 		(7,1,0): 1 }
-
-# pt = 3
-
-
-
-pt = 1
-
-# s = {}
-# for t in H:
-# 	if t < 4:
-# 		s[t,0] = 0 #LIGHT FOR S0
-# 	else:
-# 		s[t,0] = 1 #SHADOW FOR S0
-
-# for t in H:
-# 	if t < 5:
-# 		s[t,1] = 0 #LIGHT FOR S1
-# 	else:
-# 		s[t,1] = 1 #SHADOW FOR S1
-
-'''
-print("\n\nSCHEDULE WITHOUT BATTERY CONSTRAINT AND PROCESSING CAPABILITY")
-ILP(H, S, A, B, mem, up, down, col, com, p)
-
-
-print("\n\nSCHEDULE WITHOUT BATTERY CONSTRAINT")
-ILP2(H, S, A, B, mem, up, down, col, com, p, pt)
-'''
-# remap col to compact indices
-col = {
+# 5. REMAP DICTIONARIES TO COMPACT INDICES
+col_mapped = {
     (time_map[t], sat_map[j], area_map[i]): v
     for (t, j, i), v in col.items()
 }
 
-# remap com to compact indices
-com = {
+com_mapped = {
     (time_map[t], sat_map[j], ground_map[k]): v
     for (t, j, k), v in com.items()
 }
 
-# remap s (shadow/light)
-s = {
-    (time_map[t], sat_map[j]): v
-    for (t, j), v in s.items()
-}
-s_m = {} 
+s_mapped = {}
+# Fill s_mapped: Default to 0 (Light), set 1 (Shadow) if exists
+for t_raw in times_raw:
+    t_idx = time_map[t_raw]
+    for s_idx in sats_raw:
+        # Check raw 's' using raw time and sat index
+        if s.get((t_raw, s_idx), 0) == 1:
+            s_mapped[(t_idx, s_idx)] = 1
+        else:
+            s_mapped[(t_idx, s_idx)] = 0
 
-for t_idx in H:      # For every time step 0..p
-	for s_idx in S:  # For every satellite 0..m
-		if (t_idx, s_idx) in s_remapped:
-			s_m[(t_idx, s_idx)] = s_remapped[(t_idx, s_idx)]
-		else:
-			# GAP FILLING: Default to 0 (Not Shaded) if missing
-			s_m[(t_idx, s_idx)] = 0
+# 6. DEFINE DIMENSIONS
+n = len(areas_raw)   # Regions
+m = len(sats_raw)    # Satellites
+o = len(grounds_raw) # Ground Stations
+p = len(times_raw)   # Time steps
 
-print("\n\nSCHEDULE FOLLOWING BATTERY CONSTRAINT AND PROCESSING CAPABILITY")
-# ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g, s, beta)
+H = list(range(p))
+S = list(range(m))
+A = list(range(n))
+B = list(range(o))
+
+# 7. GENERATE OMEGA SETS (Sparse Indices)
+
+# omega_collection: (t, sat, area) - Directly from 'col'
+omega_collection = list(col_mapped.keys())
+
+# omega_comm: (t, sat, ground) - Directly from 'com'
+omega_comm = list(com_mapped.keys())
+
+# omega_transmit: (t, sat, area, ground)
+# CRITICAL FIX: Allow transmission of ANY Area 'a' if a link exists
+omega_transmit = []
+for (t, sat, ground) in omega_comm:
+    for area in A:
+        # We can try to download ANY area 'area'
+        # if the connection (t, sat, ground) exists.
+        omega_transmit.append((t, sat, area, ground))
+
+# 8. PARAMETERS (Hardcoded for now)
+mem = {j: 3 for j in S}
+up = {j: 2 for j in S}
+down = {k: 2 for k in B}
+C = {j: 5.65 for j in S}
+theta = {j: 3 for j in S}
+beta = {j: 20 for j in S}
+
+c = 0.4
+d = 0.3
+e = 0.2
+f = 0.2
+g = 0
+pt = 1
+
+# 9. RUN SOLVER
+print("\n--- Running ILP_LAS ---")
+print(f"Time Steps: {p}, Satellites: {m}, Areas: {n}, Stations: {o}")
+
 ILP_LAS(
     H, S, A, B,
     C, mem, up, down,
-    col, com,
+    col_mapped, com_mapped,
     theta,
     p, pt,
     c, d, e, f, g,
-    s_m,
+    s_mapped,
     beta
 )
