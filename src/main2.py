@@ -108,9 +108,11 @@ def main():
     
     main_input_csv = path.join(base_dir, 'utility', 'input_data.csv')
     tle_input_csv  = path.join(base_dir, 'utility', 'repaired_data.csv')
-    shadow_out_csv = path.join(base_dir, 'utility', 'example_data_with_shadow_light_1.csv') 
+    ##use only if repairing of shadow data is needed
+    shadow_out_csv = path.join(base_dir, 'utility', 'example_data_with_light_shadow.csv') 
     
-    start_time_str = "2025-11-28 19:58:24" 
+    ##need to change based on input data
+    start_time_str = "2025-11-28T19:24:19.0Z" 
 
     # --- STEP 1: LOAD MAIN DATA ---
     print(f"\n[Step 1] Processing Main Inputs...")
@@ -120,6 +122,8 @@ def main():
 
     # --- STEP 2: GENERATE SHADOWS ---
     print(f"\n[Step 2] Generating Shadow Data...")
+    
+    ##Use Only if reparing of shadow data is needed
     generate_shadow_csv(tle_input_csv, shadow_out_csv, start_time_str, duration_sec)
     
     # --- STEP 3: MAP SHADOWS ---
@@ -136,8 +140,8 @@ def main():
     mem = {j: 3 for j in S}
     up = {j: 2 for j in S}
     down = {k: 2 for k in B}
-    C = {j: 100 for j in S}
-    beta = {j: 250 for j in S}
+    C = {j: 70000 for j in S}
+    beta = {j: 100000 for j in S}
     theta = {j: 3 for j in S}
     
     c_solar, d_idle, e_col, f_com, g_proc = 0.4, 0.3, 0.2, 0.2, 0.0
@@ -145,6 +149,7 @@ def main():
 
     # --- STEP 5: SOLVE ---
     print(f"\n[Step 5] Launching Optimization...")
+    print("s_mapped", s_mapped)
     
     status, obj_val, _, _ = ILP_LAS(
         H, S, A, B,
