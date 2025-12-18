@@ -1,134 +1,168 @@
-from ILP_LAS import ILP_LAS
-import pandas as pd
-from os import path
-import ast # Needed to parse the string "[(0,10), (20,30)]" into a list
-from utility.d import process_satellite_data
+# from os import path
+# import gurobipy as gp # Keep if you use GRB constants, though PuLP uses 1 for Optimal
 
-# 1. SETUP PATHS
-base_dir = path.dirname(path.abspath(__file__))
-csv_path = path.join(base_dir, 'utility', 'input_data.csv')
+# # --- IMPORTS ---
+# from ILP_LAS import ILP_LAS 
+# from utility.d import process_satellite_data
+# # Note: Ensure your dense shadow code is saved as 'utility/shadow_test.py'
+# from utility.shadow_test import generate_shadow_csv, get_shadow_s_mapped
 
-# 2. LOAD CONNECTIVITY DATA (col, com)
-# Note: process_satellite_data returns (col, com, unique_sats_index)
-col, com, unique_sats_index = process_satellite_data(csv_path)
+# def main():
+#     print("--- INITIALIZING DRIVER SCRIPT ---")
 
-# 3. LOAD SHADOW DATA (s) - MANUALLY
-# We need to read the CSV again to get the 'shadow_ranges' column
-df = pd.read_csv(csv_path)
-s = {}
-
-# Re-create sat_map helper from the loaded index for consistency
-# unique_sats_index is the list ['SatA', 'SatB'...]
-sat_name_to_code = {name: i for i, name in enumerate(unique_sats_index)}
-
-for row in df.itertuples():
-    # Convert Sat Name -> Code
-    if row.sat_name not in sat_name_to_code: continue # Skip unknown sats
-    s_idx = sat_name_to_code[row.sat_name]
+#     # --- CONFIGURATION ---
+#     base_dir = path.dirname(path.abspath(__file__))
     
-    # Parse the shadow string "[(0, 100), ...]"
-    try:
-        ranges = ast.literal_eval(row.shadow_ranges)
-    except:
-        ranges = [] # Handle empty or malformed strings
-        
-    # Mark these times as "1" (Shadow) in 's' dictionary
-    for (start, end) in ranges:
-        for t in range(int(start), int(end) + 1):
-            s[(t, s_idx)] = 1
+#     main_input_csv = path.join(base_dir, 'utility', 'input_data.csv')
+#     tle_input_csv  = path.join(base_dir, 'utility', 'repaired_data.csv')
+#     shadow_out_csv = path.join(base_dir, 'utility', 'example_data_with_shadow_light_1.csv') 
+    
+#     # Start Time
+#     start_time_str = "2025-11-28 09:11:54" 
 
-# 4. EXTRACT RAW LISTS & CREATE MAPPINGS
-times_raw = sorted({t for (t,_,_) in list(col.keys()) + list(com.keys())})
-# Add shadow times to known times to avoid "KeyError" later
-times_raw = sorted(list(set(times_raw) | {t for (t,_) in s.keys()}))
+#     # --- STEP 1: LOAD MAIN DATA FIRST ---
+#     print(f"\n[Step 1] Processing Main Inputs from {path.basename(main_input_csv)}...")
+#     col, com, dims = process_satellite_data(main_input_csv)
+    
+#     # Dynamic Duration
+#     duration_sec = dims['p'] 
+#     print(f" -> Dynamic Duration Set: {duration_sec} seconds")
 
-sats_raw  = sorted(list(range(len(unique_sats_index)))) # 0..m
-areas_raw = sorted({a for (t,s,a) in col.keys()})
-grounds_raw= sorted({g for (t,s,g) in com.keys()})
+#     # --- STEP 2: GENERATE SHADOW DATA ---
+#     print(f"\n[Step 2] Generating Shadow Data...")
+#     generate_shadow_csv(tle_input_csv, shadow_out_csv, start_time_str, duration_sec)
+    
+#     # --- STEP 3: MAP SHADOWS TO SOLVER INDICES ---
+#     print(f"\n[Step 3] Mapping Shadows to Solver Indices...")
+#     # This must return the DENSE dictionary (0s and 1s) to work with your ILP
+#     s_mapped = get_shadow_s_mapped(shadow_out_csv, dims)
 
-# Create Mappings
-time_map = {t:i for i,t in enumerate(times_raw)}
-inv_time_map = {i:t for t,i in time_map.items()}
-sat_map  = {s:s for s in sats_raw} # Identity map (0->0) since we used factorize
-area_map = {a:i for i,a in enumerate(areas_raw)}
-ground_map= {g:i for i,g in enumerate(grounds_raw)}
+#     # --- STEP 4: DEFINE SETS & PARAMETERS ---
+#     p = dims['p'] 
+#     n = dims['n'] 
+#     m = dims['m'] 
+#     o = dims['o'] 
 
-# 5. REMAP DICTIONARIES TO COMPACT INDICES
-col_mapped = {
-    (time_map[t], sat_map[j], area_map[i]): v
-    for (t, j, i), v in col.items()
-}
+#     H = list(range(p))
+#     S = list(range(m))
+#     A = list(range(n))
+#     B = list(range(o))
+    
+#     print(f"\n[Setup] Problem Size: {p} Time Steps, {m} Sats, {n} Areas, {o} Stations")
 
-com_mapped = {
-    (time_map[t], sat_map[j], ground_map[k]): v
-    for (t, j, k), v in com.items()
-}
+#     # Physics Parameters
+#     mem = {j: 3 for j in S}
+#     up = {j: 2 for j in S}
+#     down = {k: 2 for k in B}
+    
+#     C = {j: 5.65 for j in S}
+#     beta = {j: 20 for j in S}
+#     theta = {j: 3 for j in S}
+    
+#     # Costs
+#     c_solar = 0.4
+#     d_idle = 0.3
+#     e_col = 0.2
+#     f_com = 0.2
+#     g_proc = 0.0
+#     pt_proc_time = 1
 
-s_mapped = {}
-# Fill s_mapped: Default to 0 (Light), set 1 (Shadow) if exists
-for t_raw in times_raw:
-    t_idx = time_map[t_raw]
-    for s_idx in sats_raw:
-        # Check raw 's' using raw time and sat index
-        if s.get((t_raw, s_idx), 0) == 1:
-            s_mapped[(t_idx, s_idx)] = 1
-        else:
-            s_mapped[(t_idx, s_idx)] = 0
+#     # --- STEP 5: RUN SOLVER ---
+#     print(f"\n[Step 5] Launching Optimization...")
+    
+#     # Capture the TUPLE return values (status, obj, _, _)
+#     status, obj_val, _, _ = ILP_LAS(
+#         H, S, A, B,
+#         C, mem, up, down,
+#         col, com,
+#         theta,
+#         p, pt_proc_time,
+#         c_solar, d_idle, e_col, f_com, g_proc,
+#         s_mapped,
+#         beta
+#     )
+    
+#     # --- CHECK RESULTS ---
+#     # PuLP Status: 1 = Optimal
+#     if status == 1:
+#         print(f"\n--- OPTIMAL SOLUTION FOUND (Obj: {obj_val}) ---")
+#         print("Detailed variable assignments were printed above by ILP_LAS.")
+#     else:
+#         print(f"\n[Result] Optimization Ended with Status Code: {status}")
 
-# 6. DEFINE DIMENSIONS
-n = len(areas_raw)   # Regions
-m = len(sats_raw)    # Satellites
-o = len(grounds_raw) # Ground Stations
-p = len(times_raw)   # Time steps
+# if __name__ == "__main__":
+#     main()
 
-H = list(range(p))
-S = list(range(m))
-A = list(range(n))
-B = list(range(o))
+from os import path
 
-# 7. GENERATE OMEGA SETS (Sparse Indices)
+# --- IMPORTS ---
+from ILP_LAS import ILP_LAS 
+from utility.d import process_satellite_data
+from utility.shadow_test import generate_shadow_csv, get_shadow_s_mapped
 
-# omega_collection: (t, sat, area) - Directly from 'col'
-omega_collection = list(col_mapped.keys())
+def main():
+    print("--- INITIALIZING DRIVER SCRIPT (CBC) ---")
 
-# omega_comm: (t, sat, ground) - Directly from 'com'
-omega_comm = list(com_mapped.keys())
+    # --- CONFIGURATION ---
+    base_dir = path.dirname(path.abspath(__file__))
+    
+    main_input_csv = path.join(base_dir, 'utility', 'input_data.csv')
+    tle_input_csv  = path.join(base_dir, 'utility', 'repaired_data.csv')
+    shadow_out_csv = path.join(base_dir, 'utility', 'example_data_with_shadow_light_1.csv') 
+    
+    start_time_str = "2025-11-28 19:58:24" 
 
-# omega_transmit: (t, sat, area, ground)
-# CRITICAL FIX: Allow transmission of ANY Area 'a' if a link exists
-omega_transmit = []
-for (t, sat, ground) in omega_comm:
-    for area in A:
-        # We can try to download ANY area 'area'
-        # if the connection (t, sat, ground) exists.
-        omega_transmit.append((t, sat, area, ground))
+    # --- STEP 1: LOAD MAIN DATA ---
+    print(f"\n[Step 1] Processing Main Inputs...")
+    col, com, dims = process_satellite_data(main_input_csv)
+    duration_sec = dims['p'] 
+    print(f" -> Duration: {duration_sec} seconds")
 
-# 8. PARAMETERS (Hardcoded for now)
-mem = {j: 3 for j in S}
-up = {j: 2 for j in S}
-down = {k: 2 for k in B}
-C = {j: 5.65 for j in S}
-theta = {j: 3 for j in S}
-beta = {j: 20 for j in S}
+    # --- STEP 2: GENERATE SHADOWS ---
+    print(f"\n[Step 2] Generating Shadow Data...")
+    generate_shadow_csv(tle_input_csv, shadow_out_csv, start_time_str, duration_sec)
+    
+    # --- STEP 3: MAP SHADOWS ---
+    print(f"\n[Step 3] Mapping Shadows...")
+    s_mapped = get_shadow_s_mapped(shadow_out_csv, dims)
 
-c = 0.4
-d = 0.3
-e = 0.2
-f = 0.2
-g = 0
-pt = 1
+    # --- STEP 4: PARAMETERS ---
+    p, n, m, o = dims['p'], dims['n'], dims['m'], dims['o']
 
-# 9. RUN SOLVER
-print("\n--- Running ILP_LAS ---")
-print(f"Time Steps: {p}, Satellites: {m}, Areas: {n}, Stations: {o}")
+    H, S, A, B = list(range(p)), list(range(m)), list(range(n)), list(range(o))
+    
+    print(f"\n[Setup] Problem: {p} Steps, {m} Sats, {n} Areas, {o} Stations")
 
-ILP_LAS(
-    H, S, A, B,
-    C, mem, up, down,
-    col_mapped, com_mapped,
-    theta,
-    p, pt,
-    c, d, e, f, g,
-    s_mapped,
-    beta
-)
+    mem = {j: 3 for j in S}
+    up = {j: 2 for j in S}
+    down = {k: 2 for k in B}
+    C = {j: 100 for j in S}
+    beta = {j: 250 for j in S}
+    theta = {j: 3 for j in S}
+    
+    c_solar, d_idle, e_col, f_com, g_proc = 0.4, 0.3, 0.2, 0.2, 0.0
+    pt_proc_time = 1
+
+    # --- STEP 5: SOLVE ---
+    print(f"\n[Step 5] Launching Optimization...")
+    
+    status, obj_val, _, _ = ILP_LAS(
+        H, S, A, B,
+        C, mem, up, down,
+        col, com,
+        theta,
+        p, pt_proc_time,
+        c_solar, d_idle, e_col, f_com, g_proc,
+        s_mapped,
+        beta
+    )
+    
+    # --- RESULTS ---
+    # PuLP Status Code 1 = Optimal
+    if status == 1:
+        print(f"\n--- OPTIMAL SOLUTION FOUND (Obj: {obj_val}) ---")
+    else:
+        print(f"\n[Result] Optimization Failed/Infeasible. Status Code: {status}")
+
+if __name__ == "__main__":
+    main()
