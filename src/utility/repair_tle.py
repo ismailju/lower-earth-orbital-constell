@@ -72,16 +72,20 @@ def repair_tle_line2(line):
     
     return fixed
 
-# --- MAIN EXECUTION ---
-input_csv = "src/utility/example_data.csv" # Your bad file
-output_csv = "src/utility/repaired_data.csv" # The new good file
+def repair_tle(input_csv,output_csv):
+    # --- MAIN EXECUTION ---
+    # input_csv = "src/utility/example_data.csv" # Your bad file
+    # output_csv = "src/utility/repaired_data.csv" # The new good file
 
-df = pd.read_csv(input_csv)
+    df = pd.read_csv(input_csv)
 
-print("Repairing TLEs...")
-df['TLE_Line1'] = df['TLE_Line1'].apply(repair_tle_line1)
-df['TLE_Line2'] = df['TLE_Line2'].apply(repair_tle_line2)
+    print("Repairing TLEs...")
+    df['TLE_Line1'] = df['TLE_Line1'].apply(repair_tle_line1)
+    df['TLE_Line2'] = df['TLE_Line2'].apply(repair_tle_line2)
 
-df.to_csv(output_csv, index=False)
-print(f"Fixed CSV saved to: {output_csv}")
-print("Use this new file for Skyfield/Gurobi!")
+    df.to_csv(output_csv, index=False)
+    print(f"Fixed CSV saved to: {output_csv}")
+    print("Use this new file for Skyfield/Gurobi!")
+
+if __name__ == "__main__":
+    repair_tle()

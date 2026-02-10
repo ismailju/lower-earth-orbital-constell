@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+from pandas.errors import EmptyDataError
 
 def process_satellite_data(file_path):
     """
@@ -11,8 +12,11 @@ def process_satellite_data(file_path):
     try:
         df = pd.read_csv(file_path)
     except FileNotFoundError:
-        raise FileNotFoundError(f"Could not find file: {file_path}")
-
+        raise ValueError(f"Could not find file: {file_path}")
+    except EmptyDataError:
+        raise ValueError(f'Input CSV is empty or data parameters are different: {file_path}')
+    if df.empty:
+        raise ValueError(f'CSV has headers only but no rows')
     # 2. Process Time (UTC -> Relative Integer Seconds)
     # Ensure UTC handling is active
     df['time'] = pd.to_datetime(df['time'], utc=True)
@@ -112,6 +116,13 @@ if __name__ == "__main__":
         print(f"Horizon (p):    {dimensions['p']} seconds")
         print(f"Satellites (m): {dimensions['m']}")
         print(f"Areas (n):      {dimensions['n']}")
+        # print("\n Time Mapping Sample (Rel Sec -> Rel Sec):")
+        # time_map_items = list(dimensions['time_map'].items())
+        # for i,j in time_map_items:
+        #     print(f" {i} -> {j}")
+        # print("\n Unique Satellites:")
+        # for idx, sat_name in enumerate(dimensions['unique_sats']):
+        #     print(f" {idx} : {sat_name}")
         
         print("\n" + "="*40)
         print(" SAMPLE 'col' OBSERVATIONS")
