@@ -69,6 +69,8 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
         prob += z[(t,i,j)] <= plp.lpSum(x[(t1,i,j)] for (t1,ii,jj) in x if ii == i and jj == j and t1 < t)
             
     # 10. Battery Constraints
+    #shodow needed to be inputted as list of list of pair/list
+    shadow = []
     for j in S:
         for t in H:
             current_battery = (
@@ -79,8 +81,16 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
                 - d * (t + 1)
                 + c * plp.lpSum((1 - s_mapped.get((t1,j), 0)) for t1 in range(0, t + 1))
             )
-
-            prob += current_battery >= theta[j], f"Bat_Min_S{j}_T{t}"
+            in_shadow = s_mapped.get((t,j), 0)
+            if in_shadow == 1:
+                for every_shadow in shadow[j]:
+                    if every_shadow[0] <= t <= every_shadow[1]:
+                        current_theta = (every_shadow[1] - t) * d
+                        break
+            else: current_theta = 0
+            
+            prob += current_battery >= current_theta, f"Bat_Min_S{j}_T{t}"
+            # prob += current_battery >= theta[j], f"Bat_Min_S{j}_T{t}"
             prob += current_battery <= beta[j], f"Bat_Max_S{j}_T{t}"
     
 
