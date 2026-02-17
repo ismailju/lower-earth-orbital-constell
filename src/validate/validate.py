@@ -83,7 +83,8 @@ def validate(shadow,col,com,proc,Cj,H,Bj,d,c,discharge_rate_col,discharge_rate_c
       print(f"[t={t}] Format Error: Dictionary value at {t} is not a list. {e}")
       continue
     #end for
-  return (100 * no_of_collection)/len(col)
+  accuracy = (100 * no_of_collection)/len(col) if len(col) > 0 else 0
+  return accuracy
 
 def call_validate(col_list, com_list, proc_list,shadow_list):
   # from getData import process_mission_data
@@ -116,9 +117,9 @@ def call_validate(col_list, com_list, proc_list,shadow_list):
   #   [[0, 15], [46, 60]]      # SAT_4
   # ]
   # 4. Loop through each satellite
-  print(col_list)
-  print(com_list)
-  print(proc_list)
+  # print(col_list)
+  # print(com_list)
+  # print(proc_list)
   for sat_id in range(len(col_list)):
     # 1. EXTRACT Shadow for THIS satellite
     # Safety check to e
