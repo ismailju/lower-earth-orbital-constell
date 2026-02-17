@@ -17,7 +17,7 @@ def set_physical_parameters2(S,B):
     mem = {j: 3 for j in S}
     up = {j: 2 for j in S}
     down = {k: 2 for k in B}
-    C = {j: 80 for j in S}
+    C = {j: 4 for j in S}
     beta = {j: 100 for j in S}
     theta = {j: 3 for j in S}
     return mem, up, down, C, beta, theta
@@ -26,8 +26,8 @@ def set_discharge_rate_parameters3():
     c_solar = 0.4
     d_idle = 0.3
     e_col = 0.25
-    f_com = 0.4
-    g_proc = 0.25
+    f_com = 0.25
+    g_proc = 0.4
     return c_solar, d_idle, e_col, f_com, g_proc
 
 def set_processing_time_pt():
@@ -71,8 +71,8 @@ def helper(fileId):
 #############################################################################
     #### --- STEP 5: SOLVE --- ####
     print(f"\n[Step 5] Launching Optimization...")
-    
-    status, obj_val,result = ILP_LAS(
+    from ILP_LAS2 import ILP_LAS2
+    status, obj_val,result = ILP_LAS2(
         H, S, A, B,
         C, mem, up, down,
         col, com,
@@ -96,7 +96,7 @@ def helper(fileId):
 ################################################################
     #########################################################
 
-    
+    print(dims)
     # --- RESULTS ---
     # PuLP Status Code 1 = Optimal
     if status == 1:

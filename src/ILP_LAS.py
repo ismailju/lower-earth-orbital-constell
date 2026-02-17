@@ -7,15 +7,22 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
     # 1. Initialize Problem
     prob = plp.LpProblem('LEO_K', plp.LpMaximize)
 
-    # 2. Define Variables (Sparse Dictionaries)
-    # Collection
-    x = plp.LpVariable.dicts("x", [(t, i, j) for (t, j, i) in col], cat="Binary")
+    # # 2. Define Variables (Sparse Dictionaries)
+    # # Collection
+    # x = plp.LpVariable.dicts("x", [(t, i, j) for (t, j, i) in col], cat="Binary")
     
-    # Processing (only if time allows)
-    z = plp.LpVariable.dicts("z", [(t, i, j) for (t, j, i) in col if t <= p - pt], cat="Binary")
+    # # Processing (only if time allows)
+    # z = plp.LpVariable.dicts("z", [(t, i, j) for (t, j, i) in col if t <= p - pt], cat="Binary")
     
-    # Communication
-    y = plp.LpVariable.dicts("y", [(t, i, j, k) for (t, j, k) in com for i in A], cat="Binary")
+    # # Communication
+    # y = plp.LpVariable.dicts("y", [(t, i, j, k) for (t, j, k) in com for i in A], cat="Binary")
+    ###################################### VARIABLES ###########################################
+	#Denotes that data from Ai is collected by satellite Sj at time instant t
+    x = plp.LpVariable.dicts("x", [(t,i,j) for t in H for i in A for j in S], cat = "Binary")
+	#Denotes that at time instant t,  Sj starts processing data collected from sub-region Ai
+    z = plp.LpVariable.dicts("z", [(t,i,j) for t in H for i in A for j in S], cat = "Binary")
+	#Denotes that data from Ai collected by Sj is downloaded at GS Bk at time instant t
+    y = plp.LpVariable.dicts("y", [(t,i,j,k) for t in H for i in A for j in S for k in B], cat = 'Binary')
 
     # --- CONSTRAINTS ---
 
@@ -71,6 +78,9 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
     # 10. Battery Constraints
     #shodow needed to be inputted as list of list of pair/list
     shadow = []
+    print("##############")
+    print(f"H:{len(H)-1} S:{len(S)-1}")
+    print(f"Last key:{next(reversed(s_mapped))}")
     for j in S:
         for t in H:
             current_battery = (
@@ -81,16 +91,16 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
                 - d * (t + 1)
                 + c * plp.lpSum((1 - s_mapped.get((t1,j), 0)) for t1 in range(0, t + 1))
             )
-            in_shadow = s_mapped.get((t,j), 0)
-            if in_shadow == 1:
-                for every_shadow in shadow[j]:
-                    if every_shadow[0] <= t <= every_shadow[1]:
-                        current_theta = (every_shadow[1] - t) * d
-                        break
-            else: current_theta = 0
+            # in_shadow = s_mapped.get((t,j), 0)
+            # if in_shadow == 1:
+            #     for every_shadow in shadow[j]:
+            #         if every_shadow[0] <= t <= every_shadow[1]:
+            #             current_theta = (every_shadow[1] - t) * d
+            #             break
+            # else: current_theta = 0
             
-            prob += current_battery >= current_theta, f"Bat_Min_S{j}_T{t}"
-            # prob += current_battery >= theta[j], f"Bat_Min_S{j}_T{t}"
+            # prob += current_battery >= current_theta, f"Bat_Min_S{j}_T{t}"
+            prob += current_battery >= theta[j], f"Bat_Min_S{j}_T{t}"
             prob += current_battery <= beta[j], f"Bat_Max_S{j}_T{t}"
     
 
@@ -125,30 +135,33 @@ def ILP_LAS(H, S, A, B, C, mem, up, down, col, com, theta, p, pt, c, d, e, f, g,
     print("STATUS: ", plp.LpStatus[status])
 
     # Print Non-Zero Variables
-    # col_result = ()
-    # com_result = ()
-    # proc_result = ()
+    col_result = {}
+    com_result = {}
+    proc_result = {}
     if status == 1: # 1 is 'Optimal' in PuLP
         print("\n--- RESULTS ---")
         for (t,i,j), var in x.items():
             if var.value() == 1:
                 print(f"COLLECT: T={t} Sat={j} Area={i}")
-                # col_result[t] = i
+                col_result[t] = i
         for (t,i,j), var in z.items():
             if var.value() == 1:
                 print(f"PROCESS: T={t} Sat={j} Area={i}")
-                # proc_result[t] = i
+                proc_result[t] = i
         for (t,i,j,k), var in y.items():
             if var.value() == 1:
                 print(f"DOWNLNK: T={t} Sat={j} Area={i} -> Station={k}")
-                # com_result.setdefault(t,[]).append(i)
-    
-    # print("Col Result:\n")
-    # print(col_result)
-    # print("Com Result\n")
-    # print(com_result)
-    # print("Process Result:\n")
-    # print(proc_result)
+                com_result.setdefault(t,[]).append(i)
+    print(f"Col:")
+    for x in col: print(x)
+    print(f"Com:")
+    for x in com: print(x)
+    print("Col Result:\n")
+    print(col_result)
+    print("Com Result\n")
+    print(com_result)
+    print("Process Result:\n")
+    print(proc_result)
 
     obj_val = plp.value(prob.objective)
     return status, obj_val, [x,y,z]
