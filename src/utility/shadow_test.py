@@ -97,10 +97,10 @@ def get_shadow_s_mapped(csv_path, dims_dict):
     
     # Unpack Dimensions
     p = dims_dict['p']                
-    time_map = dims_dict['time_map']  
+    # time_map = dims_dict['time_map']  
     unique_sats = dims_dict['unique_sats'] 
     
-    inv_time_map = {v: k for k, v in time_map.items()}
+    # inv_time_map = {v: k for k, v in time_map.items()}
     m = len(unique_sats)
 
     # --- 1. PRE-FILL DENSE DICTIONARY ---
@@ -128,24 +128,40 @@ def get_shadow_s_mapped(csv_path, dims_dict):
     # --- 3. OVERWRITE SHADOWS ---
     print(f"Mapping Shadow Data...")
 
-    # We iterate only the solver time steps
-    for t_idx in range(p):
-        real_time = inv_time_map.get(t_idx, -1)
-        
-        if real_time == -1: continue
+    for s_idx in range(m):
+        sat_name = unique_sats[s_idx]
+        # If the satellite has shadow data
+        if sat_name in shadow_lookup:
+            intervals = shadow_lookup[sat_name]
 
-        for s_idx in range(m):
-            sat_name = unique_sats[s_idx]
+            for (start, end) in intervals:
+                # Clamp the shadow range o the simulation horizon (0 to p)
+                # We use integers directly as time map is identity (t==t)
+                t_start = max(0,int(start))
+                t_end = min(p-1,int(end)) #Last valid index p-1
+
+                # Provide 1 (shadow) on every second on this range
+                for t in range(t_start,t_end+1):
+                    s_mapped[((t, s_idx))] = 1
+
+    # # We iterate only the solver time steps
+    # for t_idx in range(p):
+    #     real_time = inv_time_map.get(t_idx, -1)
+        
+    #     if real_time == -1: continue
+
+    #     for s_idx in range(m):
+    #         sat_name = unique_sats[s_idx]
             
-            # If this satellite has shadow data
-            if sat_name in shadow_lookup:
-                # Check if current real_time is in any shadow range
-                for (start, end) in shadow_lookup[sat_name]:
-                    if start <= real_time <= end:
-                        # Mark as Shadow (1)
-                        # This overwrites the default 0
-                        s_mapped[(t_idx, s_idx)] = 1
-                        break
+    #         # If this satellite has shadow data
+    #         if sat_name in shadow_lookup:
+    #             # Check if current real_time is in any shadow range
+    #             for (start, end) in shadow_lookup[sat_name]:
+    #                 if start <= real_time <= end:
+    #                     # Mark as Shadow (1)
+    #                     # This overwrites the default 0
+    #                     s_mapped[(t_idx, s_idx)] = 1
+    #                     break
             
     print(f"[Info] Shadow mapping complete. Dictionary size: {len(s_mapped)}")
     return s_mapped
