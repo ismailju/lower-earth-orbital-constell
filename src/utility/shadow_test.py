@@ -5,11 +5,12 @@ from os import path
 from skyfield.api import load, EarthSatellite
 
 # --- PART A: CSV GENERATOR (Stays the same) ---
-def generate_shadow_csv(input_tle_csv, output_csv, t0_str, duration_seconds):
+def generate_shadow_csv(input_tle_csv, output_csv, t0_str, duration_seconds=5400,batch_size=20):
     """
     Reads TLEs, calculates Light/Shadow ranges using Skyfield, 
     and saves them to 'output_csv'.
     """
+    # duration_seconds=5400
     # 1. Load Data
     if not path.exists(input_tle_csv):
         print(f"[Error] TLE file {input_tle_csv} not found.")
@@ -28,14 +29,15 @@ def generate_shadow_csv(input_tle_csv, output_csv, t0_str, duration_seconds):
     except Exception as e:
         print(f"[Error] Invalid date format: {e}")
         return
-    
+    num_batches = (duration_seconds // batch_size)
     # Create Time Vector
-    seconds = np.arange(duration_seconds + 1)
+    total_seconds = num_batches * batch_size
+    seconds = np.arange(total_seconds)
     times = ts.utc(t_start.year, t_start.month, t_start.day, 
                    t_start.hour, t_start.minute, t_start.second + seconds)
 
     # 3. Calculate Shadows
-    print(f"Calculating shadows for {len(df)} satellites over {duration_seconds}s...")
+    print(f"Calculating shadows for {len(df)} satellites over {duration_seconds}s over {num_batches} batches...")
     print(f"Start Time: {t_start}")
     
     light_list = []
@@ -52,25 +54,34 @@ def generate_shadow_csv(input_tle_csv, output_csv, t0_str, duration_seconds):
         # Calculate Sunlit Boolean Array
         sunlit = sat.at(times).is_sunlit(eph)
         
-        # --- Convert Boolean Array to Ranges ---
+        states = sunlit.astype(int)
+        batch_states = np.zeros(num_batches, dtype=int)
+        for b in range(num_batches):
+            # Extract the 20 seconds that belong to this batch
+            batch_slice = states[b * batch_size : (b + 1) * batch_size]
+            
+            # If there is ANY 0 (shadow) in this slice, min() makes the whole batch 0.
+            # It only becomes 1 (light) if ALL seconds in the slice are 1.
+            batch_states[b] = np.min(batch_slice)
+         # --- Convert Boolean Array to Ranges ---
+
         l_ranges = []
         s_ranges = []
-        states = sunlit.astype(int)
+        if len(batch_states) > 0:
+            current_state = batch_states[0]
+            start_idx = 0
         
-        current_state = states[0]
-        start_idx = 0
+            for i in range(1, len(batch_states)):
+                if batch_states[i] != current_state:
+                    rng = (start_idx, i-1)
+                    if current_state == 1:
+                        l_ranges.append(rng)
+                    else:
+                        s_ranges.append(rng)
+                    current_state = batch_states[i]
+                    start_idx = i
         
-        for i in range(1, len(states)):
-            if states[i] != current_state:
-                rng = (start_idx, i-1)
-                if current_state == 1:
-                    l_ranges.append(rng)
-                else:
-                    s_ranges.append(rng)
-                current_state = states[i]
-                start_idx = i
-        
-        rng = (start_idx, len(states)-1)
+        rng = (start_idx, len(batch_states)-1)
         if current_state == 1:
             l_ranges.append(rng)
         else:

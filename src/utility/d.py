@@ -2,7 +2,7 @@ import pandas as pd
 import re
 from pandas.errors import EmptyDataError
 
-def process_satellite_data(file_path):
+def process_satellite_data(file_path,batchsize=20):
     """
     Reads satellite data and converts IDs to integer indices.
     CRITICAL CHANGE: Time is mapped directly to relative seconds (0, 1, 2...)
@@ -23,7 +23,7 @@ def process_satellite_data(file_path):
     t0 = df['time'].iloc[0]
     
     # Calculate seconds from start
-    df['rel_time'] = (df['time'] - t0).dt.total_seconds().round().astype(int)
+    df['rel_time'] = (df['time'] - t0).dt.total_seconds().round().astype(int) // batchsize  # Batch size for grouping time steps, e.g., 20 seconds per step
     
     # 3. GENERATE MAPPINGS
     

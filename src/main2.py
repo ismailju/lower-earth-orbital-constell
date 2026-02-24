@@ -5,7 +5,7 @@ from shadow_example import shadow_example
 from validation import validation
 
 def set_start_time_str():
-    start_time_str = "2026-01-05 11:38:53"
+    start_time_str = "2026-02-24 07:32:37"
     return start_time_str
 
 def get_parameters1(dims):
@@ -17,8 +17,8 @@ def set_physical_parameters2(S,B):
     mem = {j: 3 for j in S}
     up = {j: 2 for j in S}
     down = {k: 2 for k in B}
-    C = {j: 4 for j in S}
-    beta = {j: 100 for j in S}
+    C = {j: 400 for j in S}
+    beta = {j: 1000 for j in S}
     theta = {j: 3 for j in S}
     return mem, up, down, C, beta, theta
     
@@ -27,7 +27,7 @@ def set_discharge_rate_parameters3():
     d_idle = 0.3
     e_col = 0.25
     f_com = 0.25
-    g_proc = 0.4
+    g_proc = 0.2
     return c_solar, d_idle, e_col, f_com, g_proc
 
 def set_processing_time_pt():
@@ -53,6 +53,7 @@ def helper(fileId):
 
     start_time_str = set_start_time_str()
     s_mapped= shadow_example(dims,start_time_str,input_csv,tle_repaired_csv,shadow_out_csv)
+    print(f"\n[Shadow Mapping] Mapped {len(s_mapped)} shadow entries for optimization.")
 
 ############################################################################# 
     # print(f"Col: {col}")
