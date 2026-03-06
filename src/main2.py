@@ -106,9 +106,9 @@ def helper(fileId):
         print(f"\n[Result] Optimization Failed/Infeasible. Status Code: {status}")
 
 def main():
-    # for fileId in range (2):
+    # for fileId in range (0,5):
     #     helper(fileId)
-    helper(1)
+    helper(2)
 
 if __name__ == "__main__":
     main()
