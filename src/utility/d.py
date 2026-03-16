@@ -2,7 +2,7 @@ import pandas as pd
 import re
 from pandas.errors import EmptyDataError
 
-def process_satellite_data(file_path,batchsize=20):
+def process_satellite_data(file_path,batchsize):
     """
     Reads satellite data and converts IDs to integer indices.
     CRITICAL CHANGE: Time is mapped directly to relative seconds (0, 1, 2...)

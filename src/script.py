@@ -2,15 +2,15 @@ import csv
 import random
 import os
 
-input_file = "input_data.csv"
-temp_file = "temp_input_data.csv"
+input_file = os.path.join("data", "data_10", "input_data.csv")
+temp_file = os.path.join("data", "data_10", "temp_input_data.csv")
 
 # satellites you want to add
-new_satellites = ["CALSPHERE 1"]
+new_satellites = ["RADIO ROSTO (RS-15)"]
 
 sat_index = 0
 rows_since_insert = 0
-next_insert = random.randint(10, 30)
+next_insert = random.randint(7, 10)
 
 with open(input_file, "r", newline="") as infile, open(temp_file, "w", newline="") as outfile:
 
@@ -42,4 +42,4 @@ with open(input_file, "r", newline="") as infile, open(temp_file, "w", newline="
             rows_since_insert = 0
             next_insert = random.randint(10, 20)
 
-os.replace(temp_file, input_file)
+# os.replace(temp_file, input_file)

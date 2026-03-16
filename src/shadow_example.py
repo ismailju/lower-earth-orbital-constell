@@ -3,7 +3,7 @@ from utility.shadow_test import generate_shadow_csv, get_shadow_s_mapped
 from utility.repair_tle import repair_tle 
     
 
-def shadow_example(dims,start_time_str,input_csv, tle_repaired_csv,shadow_out_csv):
+def shadow_example(dims,start_time_str,input_csv, tle_repaired_csv,shadow_out_csv,batch_size):
 ##################################################################################
     #### Call repair_tle() from utility.repair_tle ####
     #### Generate repaired_data.csv ####
@@ -20,8 +20,9 @@ def shadow_example(dims,start_time_str,input_csv, tle_repaired_csv,shadow_out_cs
     #### Call generate_shadow
     # tle_input_csv  = path.join(base_dir, 'utility', 'repaired_data.csv')
     duration_sec = dims['p']
+    # batch_size=2
     print(f"\n[Step 2] Generating Shadow Data...")
-    generate_shadow_csv(tle_repaired_csv, shadow_out_csv, start_time_str, duration_sec)
+    generate_shadow_csv(tle_repaired_csv, shadow_out_csv, start_time_str, duration_sec,batch_size)
     
     
     # --- STEP 3: MAP SHADOWS ---

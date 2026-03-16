@@ -5,12 +5,12 @@ from os import path
 from skyfield.api import load, EarthSatellite
 
 # --- PART A: CSV GENERATOR (Stays the same) ---
-def generate_shadow_csv(input_tle_csv, output_csv, t0_str, duration_seconds=5400,batch_size=20):
+def generate_shadow_csv(input_tle_csv, output_csv, t0_str, duration_seconds,batch_size):
     """
     Reads TLEs, calculates Light/Shadow ranges using Skyfield, 
     and saves them to 'output_csv'.
     """
-    # duration_seconds=5400
+    duration_seconds=5400
     # 1. Load Data
     if not path.exists(input_tle_csv):
         print(f"[Error] TLE file {input_tle_csv} not found.")

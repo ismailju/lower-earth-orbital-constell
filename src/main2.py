@@ -37,13 +37,13 @@ def set_processing_time_pt():
 ######## ----------------------------------------------------------- ########
 ######## ----------------------------------------------------------- ######## 
         ####   MAIN FUNCTION CALLS EVERY OTHERS STEP BY STEP ####
-def helper(fileId):
+def helper(fileId,batch_size):
     print("--- INITIALIZING SCRIPT (CBC/Gurobi) ---")
     base_dir = path.dirname(path.abspath(__file__))
 #############################################################################
     #### Call input() ####
     main_input_csv = path.join(base_dir, 'data', f'data_{fileId}', 'input_data.csv')
-    col,com,dims = inputs(main_input_csv)
+    col,com,dims = inputs(main_input_csv,batch_size)
 
 #############################################################################
     #### Call shadow_example() ####
@@ -52,7 +52,7 @@ def helper(fileId):
     tle_repaired_csv = path.join(base_dir, 'data', f'data_{fileId}', 'repaired_data.csv')
 
     start_time_str = set_start_time_str()
-    s_mapped= shadow_example(dims,start_time_str,input_csv,tle_repaired_csv,shadow_out_csv)
+    s_mapped= shadow_example(dims,start_time_str,input_csv,tle_repaired_csv,shadow_out_csv,batch_size)
     print(f"\n[Shadow Mapping] Mapped {len(s_mapped)} shadow entries for optimization.")
 
 ############################################################################# 
@@ -106,9 +106,10 @@ def helper(fileId):
         print(f"\n[Result] Optimization Failed/Infeasible. Status Code: {status}")
 
 def main():
-    # for fileId in range (0,5):
-    #     helper(fileId)
-    helper(2)
+    batch_size = 8
+    for fileId in range (0,11):
+        helper(fileId,batch_size)
+    # helper(10,batch_size)
 
 if __name__ == "__main__":
     main()
