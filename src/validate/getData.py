@@ -184,11 +184,22 @@ def parse_shadow_ranges(csv_file_path):
     # 2. Parse strings and convert tuples to lists in one go
     #    We use a list comprehension because it is generally faster than df.apply() 
     #    for Python object manipulation (ast.literal_eval).
+    '''
     shadow_list = [
         [list(interval) for interval in ast.literal_eval(row)] 
         for row in df['shadow_ranges']
     ]
-    
+    '''
+    shadow_list = []
+    for row in df['shadow_ranges']:
+        parsed = ast.literal_eval(row)
+        
+        # Safety check: If data is triple-nested (e.g., [[[0, 15], [46, 60]]]), grab the inner list
+        if len(parsed) > 0 and isinstance(parsed[0], list) and isinstance(parsed[0][0], list):
+            parsed = parsed[0]
+            
+        shadow_list.append([list(interval) for interval in parsed])
+    print(f"\n[Shadow Parsing] Parsed {shadow_list} shadow entries from CSV.")
     return shadow_list
 
 # # --- Verification / Usage ---

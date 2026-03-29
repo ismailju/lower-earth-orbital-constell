@@ -17,8 +17,8 @@ def set_physical_parameters2(S,B):
     mem = {j: 3 for j in S}
     up = {j: 2 for j in S}
     down = {k: 2 for k in B}
-    C = {j: 400 for j in S}
-    beta = {j: 1000 for j in S}
+    C = {j: 49 for j in S}
+    beta = {j: 80 for j in S}
     theta = {j: 3 for j in S}
     return mem, up, down, C, beta, theta
     
@@ -27,7 +27,7 @@ def set_discharge_rate_parameters3():
     d_idle = 0.3
     e_col = 0.25
     f_com = 0.25
-    g_proc = 0.2
+    g_proc = 0.4
     return c_solar, d_idle, e_col, f_com, g_proc
 
 def set_processing_time_pt():
@@ -86,7 +86,8 @@ def helper(fileId,batch_size):
     ##########################################################
 #############################################################################
     #### Validation ####
-    validation(result,shadow_out_csv)
+    print(f"\n {len(H)} | Horizon: {H} \n {len(S)} | Satellites: {S} \n {len(A)} | Areas: {A} \n {len(B)} | Stations: {B}\n\n")
+    validation(result,shadow_out_csv,H,C,beta,d_idle,c_solar,e_col,f_com,g_proc)
     # print("--- Generated Dictionary Lists for Validating ---")
     # for i in range(5):
     #     print(f"\nSatellite {i}:")
@@ -96,8 +97,9 @@ def helper(fileId,batch_size):
 
 ################################################################
     #########################################################
-
+    '''
     print(dims)
+    '''
     # --- RESULTS ---
     # PuLP Status Code 1 = Optimal
     if status == 1:
@@ -106,10 +108,10 @@ def helper(fileId,batch_size):
         print(f"\n[Result] Optimization Failed/Infeasible. Status Code: {status}")
 
 def main():
-    batch_size = 8
-    for fileId in range (0,11):
-        helper(fileId,batch_size)
-    # helper(10,batch_size)
+    batch_size = 7
+    # for fileId in range (0,11):
+        # helper(fileId,batch_size)
+    helper(11,batch_size)
 
 if __name__ == "__main__":
     main()
