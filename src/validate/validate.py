@@ -104,7 +104,8 @@ def call_validate(col_list, com_list, proc_list,shadow_list,H,Cj,Bj,d,c,dr_col,d
   # col_list, com_list, proc_list = process_mission_data()
   # # col_list, com_list, proc_list = get_mission_data()
 
-
+  total_expected_collection = 0
+  total_validated_collection = 0;
   print("\n--- Starting Validation Loop ---")
   print(f"{'Sat ID':<10} | {'Scheduled':<10} | {'Collected':<18} | {'Accuracy (%)':<15}")
   print("-" * 40)
@@ -161,8 +162,16 @@ def call_validate(col_list, com_list, proc_list,shadow_list,H,Cj,Bj,d,c,dr_col,d
     collection,total,accur = accuracy
     print(f"{sat_id:<10} | {total_tasks:<10} | {collection:<5} out of {total:<5} | {accur:<15.2f}")
 
+    # TOTAL ACCURACY CALC
+    total_expected_collection += total
+    total_validated_collection += collection
+  
+  total_accuracy = total_validated_collection*100/total_expected_collection
+
   print("-" * 40)
   print("Simulation Complete.")
+
+  return total_accuracy, total_validated_collection, total_expected_collection
 
 
 def main():

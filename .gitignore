@@ -9,5 +9,4 @@ __pycache__/
 *__init__.py
 *.bsp
 *count_lines.sh
-*data/
 # *ILP_LAS2.py
